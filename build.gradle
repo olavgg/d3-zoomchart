@@ -2,7 +2,7 @@ plugins {
     id "net.ltgt.apt-eclipse" version "0.21"
     id "com.github.johnrengelman.shadow" version "5.0.0"
     id "application"
-    id "com.google.cloud.tools.jib" version "1.0.2"
+    id "com.google.cloud.tools.jib" version "1.4.0"
 }
 
 
@@ -50,17 +50,18 @@ test {
 
 jib {
     to {
-        image = "gcr.io/$googleProjectId/hello-world"
+        image = "gcr.io/$googleProjectId/zoomchart"
     }
     from {
-        image = "adoptopenjdk/openjdk11-openj9:jdk-11.0.1.13-alpine-slim"
+        image = "openjdk:11-slim"
     }
     container {
         jvmFlags = [
                 // this flag is appropriate for Serverless deployments
                 // reducing startup time by constraining the JIT
                 '-XX:TieredStopAtLevel=1',
-                '-XX:MaxRAM=128m'
+                '-Xmx64m',
+                //'-XX:MaxRAM=256m',
         ]
     }
 }

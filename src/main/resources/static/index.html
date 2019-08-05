@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Zoomable timeseries</title>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1"/>
+	<link rel="icon" href="favicon.ico" type="image/x-ico" />
+	<link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+<body>
+	<div id="data-chart"></div>
+
+	<script type="application/javascript" src="d3.v5.min.js"></script>
+	<script type="application/javascript">
+
+		// set the dimensions and margins of the graph
+		const 	margin = {top: 40, right: 30, bottom: 60, left: 90},
+				width = document.body.clientWidth - margin.left - margin.right,
+				height = document.body.clientHeight - margin.top - margin.bottom;
+
+		// append the svg object to the body of the page
+		const svg = d3.select("#data-chart")
+			.append("svg")
+			.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+			.append("g")
+			.attr("transform",
+				"translate(" + margin.left + "," + margin.top + ")");
+
+		// set the ranges
+		const x = d3.scaleTime().range([0, width]);
+		const y = d3.scaleLinear().range([height, 0]);
+
+		// gridlines in x axis function
+		function make_x_gridlines() {
+			return d3.axisBottom(x).ticks(10);
+		}
+
+		// gridlines in y axis function
+		function make_y_gridlines() {
+			return d3.axisLeft(y).ticks(10);
+		}
+
+		// Define the div for the tooltip
+		const tooltip = d3.select("body").append("div")
+			.attr("class", "tooltip")
+			.style("opacity", 0);
+
+		// Read the data
+		d3.csv("datapoints.csv")
+			.then( data => {
+
+				data = data.map( it => {
+					return { date : d3.timeParse("%Y-%m-%d")(it.date), value : it.value };
+				});
+
+				// add the X gridlines
+				svg.append("g")
+					.attr("class", "grid")
+					.attr("transform", "translate(0," + height + ")")
+					.call(make_x_gridlines()
+						.tickSize(-height)
+						.tickFormat("")
+					);
+
+				// add the Y gridlines
+				svg.append("g")
+					.attr("class", "grid")
+					.call(make_y_gridlines()
+						.tickSize(-width)
+						.tickFormat("")
+					);
+
+				// Add X axis --> it is a date format
+				const x = d3.scaleTime()
+					.domain(d3.extent(data, function(d) { return d.date; }))
+					.range([ 0, width ]);
+				const xAxis = svg.append("g")
+					.attr("transform", "translate(0," + height + ")")
+					.call(d3.axisBottom(x));
+
+				// Add Y axis
+				const y = d3.scaleLinear()
+					.domain([0, d3.max(data, function(d) { return +d.value; })])
+					.range([ height, 0 ]);
+				const yAxis = svg.append("g").call(d3.axisLeft(y));
+
+				// Add a clipPath: everything out of this area won't be drawn.
+				const clip = svg.append("defs").append("svg:clipPath")
+					.attr("id", "clip")
+					.append("svg:rect")
+					.attr("width", width )
+					.attr("height", height )
+					.attr("x", 0)
+					.attr("y", 0);
+
+				// Add brushing
+				const brush = d3.brushX()                 // Add the brush feature using the d3.brush function
+					.extent( [ [0,0], [width,height] ] )  // initialise the brush area: start at 0,0 and finishes at width,height: it means I select the whole graph area
+					.on("end", updateChart);              // Each time the brush selection changes, trigger the 'updateChart' function
+
+				// Create the line variable: where both the line and the brush take place
+				const line = svg.append('g').attr("clip-path", "url(#clip)");
+
+				// Add the line
+				line.append("path")
+					.datum(data)
+					.attr("class", "ts-line")  // I add the class line to be able to modify this line later on.
+					.attr("fill", "none")
+					.attr("stroke", "steelblue")
+					.attr("stroke-width", 1.5)
+					.attr("d", d3.line()
+						.x(function(d) { return x(d.date) })
+						.y(function(d) { return y(d.value) })
+					);
+
+				// Add the brushing
+				line
+					.append("g")
+					.attr("class", "brush")
+					.call(brush);
+
+				// Add focus
+				const focus = svg.append("g")
+					.attr("class", "focus")
+					.style("display", "none");
+
+				focus.append("circle")
+					.attr("r", 3);
+
+				const focusWidth = 100;
+				focus.append("rect")
+					.attr("class", "tooltip")
+					.attr("width", focusWidth)
+					.attr("height", 50)
+					.attr("x", -50)
+					.attr("y", -60)
+					.attr("rx", 4)
+					.attr("ry", 4);
+
+				focus.append("text")
+					.attr("class", "tooltip-date")
+					.attr("x", 0)
+					.attr("y", -40)
+					.attr("text-anchor", "middle");
+
+				focus.append("text")
+					.attr("class", "tooltip-value")
+					.attr("x", 0)
+					.attr("y", -20)
+					.attr("text-anchor", "middle");
+
+				let xPos = x(data[0].date);
+				let yPos = y(data[0].value);
+				focus.attr("transform", "translate(" + xPos + "," + yPos + ")");
+				focus.select(".tooltip-date").text(d3.timeFormat("%Y-%m-%d")(data[0].date));
+				focus.select(".tooltip-value").text(data[0].value);
+
+				svg
+					.on("mouseover", function() { focus.style("display", null); })
+					.on("mouseout", function() { focus.style("display", "none"); })
+					.on("mousemove", mousemove);
+
+				function mousemove() {
+
+					const x0 = x.invert(d3.mouse(this)[0]),
+						i = d3.bisector(function(d) { return d.date; }).left(data, x0, 1),
+						d0 = data[i - 1],
+						d1 = data[i];
+
+					if(d1){
+						const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+
+						focus.attr("transform", "translate(" + x(d.date) + "," + y(d.value) + ")");
+						focus.select(".tooltip-date").text(d3.timeFormat("%Y-%m-%d")(d.date));
+						focus.select(".tooltip-value").text(d.value);
+					}
+
+				}
+
+				// A function that set idleTimeOut to null
+				let idleTimeout = null;
+				function idled() { idleTimeout = null; }
+
+				// A function that update the chart for given boundaries
+				function updateChart() {
+
+					// What are the selected boundaries?
+					extent = d3.event.selection;
+
+					// If no selection, back to initial coordinate. Otherwise, update X axis domain
+					if(!extent){
+						if (!idleTimeout) return idleTimeout = setTimeout(idled, 350); // This allows to wait a little bit
+						//x.domain([ 4,8])
+						x.domain([data[0].date, data[data.length -1].date]);
+					}else{
+						x.domain([ x.invert(extent[0]), x.invert(extent[1]) ]);
+						line.select(".brush").call(brush.move, null) // This remove the grey brush area as soon as the selection has been done
+					}
+
+					// Update axis and line position
+					xAxis.transition().duration(1000).call(d3.axisBottom(x));
+					line
+						.select('.ts-line')
+						.transition()
+						.duration(1000)
+						.attr("d", d3.line()
+							.x(function(d) { return x(d.date) })
+							.y(function(d) { return y(d.value) })
+						);
+
+					// If user double click, reinitialize the chart
+					svg.on("dblclick", updateChart);
+				}
+		});
+	</script>
+</body>
+</html>

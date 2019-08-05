@@ -1,0 +1,60 @@
+html,body{
+	margin: 0;
+	font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
+	font-size: 16px;
+}
+
+body{
+	height: 100vh;
+	background: #202020;
+	overflow: hidden;
+}
+
+div.tooltip {
+	position: absolute;
+	text-align: center;
+	width: 60px;
+	height: 60px;
+	padding: 10px;
+	font: 12px sans-serif;
+	background: #fff;
+	border: 0;
+	border-radius: 4px;
+	pointer-events: none;
+}
+
+svg path.ts-line{
+	stroke: #00bfbf;
+}
+
+svg g.tick text{
+	fill: #fff;
+}
+
+svg g.tick line,
+svg g path.domain,
+svg g.grid g.tick line{
+	stroke: #2a2a2a;
+}
+
+.overlay {
+	fill: none;
+	pointer-events: all;
+}
+
+.focus circle {
+	fill: #00dcab;
+}
+
+.focus text {
+	font-size: 14px;
+}
+
+.tooltip {
+	fill: white;
+	stroke: #000;
+}
+
+.tooltip-date, .tooltip-likes {
+	font-weight: bold;
+}

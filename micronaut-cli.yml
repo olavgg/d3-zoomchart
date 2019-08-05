@@ -1,0 +1,5 @@
+profile: service
+defaultPackage: zoomchart
+---
+testFramework: junit
+sourceLanguage: java
